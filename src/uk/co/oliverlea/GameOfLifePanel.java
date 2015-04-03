@@ -12,7 +12,7 @@ public class GameOfLifePanel extends JPanel {
 
     private static final int INITIAL_TICKS_PER_SECOND = 5;
     private static final int MINIMUM_TICKS_PER_SECOND = 1;
-    private static final int MAXIMUM_TICKS_PERS_SECOND = 30;
+    private static final int MAXIMUM_TICKS_PERS_SECOND = 60;
 
     private int ticksPerSecond = INITIAL_TICKS_PER_SECOND;
     private long optimalTime = 1000 / ticksPerSecond;

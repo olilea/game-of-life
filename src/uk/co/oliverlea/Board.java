@@ -10,6 +10,7 @@ import java.util.Random;
 import java.util.concurrent.*;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 /**
@@ -17,57 +18,65 @@ import java.util.stream.IntStream;
  */
 public class Board extends JPanel {
 
-    private int blockWidth = 5;
-    private int blockHeight = 5;
-
-    private Dimension boardSize;
-
-    private List<List<Tile>> tiles;
-    private List<List<Tile>> nextTiles;
-
     private static final int AVAILABLE_PROCESSORS = Runtime.getRuntime().availableProcessors();
 
     private ExecutorService executorService;
     private List<Callable<Void>> parallelTickers;
 
+    private Dimension boardSize;
+    private Dimension blockSize;
+
+    private List<List<Tile>> tiles;
+    private List<List<Tile>> nextTiles;
+
+    private final MouseAdapter mouseListener = new MouseAdapter() {
+        @Override
+        public void mouseClicked(MouseEvent e) {
+            applyToTileAtPoint(e.getPoint(), Tile::invert);
+        }
+        @Override
+        public void mouseDragged(MouseEvent e) {
+            applyToTileAtPoint(e.getPoint(), t -> t.setAlive(true));
+        }
+    };
+
     public Board(Dimension d) {
         this.boardSize = d;
-        super.setPreferredSize(new Dimension(d.width * blockWidth, d.height * blockHeight));
+        this.blockSize = new Dimension(5, 5);
         Random r = new Random(System.currentTimeMillis());
         this.tiles = createTiles(r::nextBoolean);
         this.nextTiles = createTiles(() -> false);
-        MouseAdapter mouseListener = new MouseAdapter() {
-            @Override
-            public void mouseClicked(MouseEvent e) {
-                applyToTileAtPoint(e.getPoint(), Tile::invert);
-            }
-            @Override
-            public void mouseDragged(MouseEvent e) {
-                applyToTileAtPoint(e.getPoint(), t -> t.setAlive(true));
-            }
-        };
-        this.addMouseListener(mouseListener);
-        this.addMouseMotionListener(mouseListener);
         this.executorService = Executors.newFixedThreadPool(AVAILABLE_PROCESSORS);
-        this.parallelTickers = new ArrayList<>(AVAILABLE_PROCESSORS);
-        IntStream.range(0, AVAILABLE_PROCESSORS).forEachOrdered(i -> {
-            parallelTickers.add(() -> {
-                try {
-                    int fromHeight = (boardSize.height / AVAILABLE_PROCESSORS) * i;
-                    int toHeight = (boardSize.height / AVAILABLE_PROCESSORS) * (i + 1);
-                    for (int row = fromHeight; row < toHeight; row++) {
-                        for (int column = 0; column < boardSize.width; column++) {
-                            Tile t = tiles.get(row).get(column);
-                            boolean nextState = shouldLive(t, row, column);
-                            nextTiles.get(row).get(column).setAlive(nextState);
-                        }
-                    }
-                } catch (Exception e) {
-                    e.printStackTrace();
+        this.parallelTickers = initParallelTickers(AVAILABLE_PROCESSORS);
+        initGui();
+    }
+
+    private List<Callable<Void>> initParallelTickers(int split) {
+        return IntStream.range(0, split)
+                .mapToObj(this::tickerFor).collect(Collectors.toList());
+    }
+
+    private Callable<Void> tickerFor(int i) {
+        return () -> {
+            int fromHeight = (boardSize.height / AVAILABLE_PROCESSORS) * i;
+            int toHeight = (boardSize.height / AVAILABLE_PROCESSORS) * (i + 1);
+            for (int row = fromHeight; row < toHeight; row++) {
+                for (int column = 0; column < boardSize.width; column++) {
+                    boolean nextState = shouldLive(row, column);
+                    nextTiles.get(row).get(column).setAlive(nextState);
                 }
-                return null;
-            });
-        });
+            }
+            return null;
+        };
+    }
+
+    private void initGui() {
+        super.setPreferredSize(new Dimension(
+                boardSize.width * blockSize.width,
+                boardSize.height * blockSize.width
+        ));
+        super.addMouseListener(mouseListener);
+        super.addMouseMotionListener(mouseListener);
     }
 
     private List<List<Tile>> createTiles(Supplier<Boolean> withValue) {
@@ -102,18 +111,23 @@ public class Board extends JPanel {
         for (int row = 0; row < boardSize.height; row++) {
             for (int col = 0; col < boardSize.width; col++) {
                 g.setColor(tiles.get(row).get(col).isAlive() ? Color.BLACK : Color.WHITE);
-                g.fillRect(col * blockWidth, row * blockHeight, blockWidth, blockHeight);
+                g.fillRect(
+                        col * blockSize.width,
+                        row * blockSize.height,
+                        blockSize.width,
+                        blockSize.height
+                );
             }
         }
     }
 
     protected void resizeTo(Dimension d) {
         this.setPreferredSize(d);
-        blockWidth = d.width / boardSize.width;
-        blockHeight = d.height / boardSize.height;
+        blockSize.setSize(d.width / boardSize.width, d.height / boardSize.height);
     }
 
-    private boolean shouldLive(Tile t, int row, int column) {
+    private boolean shouldLive(int row, int column) {
+        Tile t = getTile(row, column);
         int neighbours = getNeighbors(row, column);
         if (t.isAlive()) {
             switch (neighbours) {
@@ -134,8 +148,8 @@ public class Board extends JPanel {
     }
 
     private void applyToTileAtPoint(Point p, Consumer<Tile> func) {
-        int row = (p.y / blockHeight) % boardSize.height;
-        int col = (p.x / blockWidth) % boardSize.width;
+        int row = (p.y / blockSize.height) % boardSize.height;
+        int col = (p.x / blockSize.width) % boardSize.width;
         if (row < 0 || col < 0 || row >= boardSize.width || row >= boardSize.height) return;
         func.accept(getTile(row, col));
         repaint();

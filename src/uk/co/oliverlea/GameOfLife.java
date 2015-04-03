@@ -26,6 +26,6 @@ public class GameOfLife {
     }
 
     public static void main(String[] args) {
-        new GameOfLife(new Dimension(800, 500));
+        new GameOfLife(new Dimension(800, 400));
     }
 }
