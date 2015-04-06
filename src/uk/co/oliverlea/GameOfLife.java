@@ -12,11 +12,9 @@ public class GameOfLife {
 
     public GameOfLife(Dimension d) {
         this.panel = new GameOfLifePanel(d);
-        show();
-        panel.run();
     }
 
-    private void show() {
+    public void show() {
         JFrame gameFrame = new JFrame("Game of Life");
         gameFrame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         gameFrame.setLocationRelativeTo(null);
@@ -26,6 +24,7 @@ public class GameOfLife {
     }
 
     public static void main(String[] args) {
-        new GameOfLife(new Dimension(800, 400));
+        GameOfLife gol = new GameOfLife(new Dimension(200, 200));
+        SwingUtilities.invokeLater(gol::show);
     }
 }
